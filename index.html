@@ -107,6 +107,7 @@
                         } // Suwak pod wykresem do kontroli zakresu (skali)
                     },
                     yaxis: { // Główna oś po lewej stronie - Teraz Difficulty
+                        visible: false, // Schowana, bo difficulty jest domyslnie wylaczone w legendzie
                         fixedrange: false, // Domyślnie, dla głównej osi
                         title: 'Difficulty',
                         titlefont: { color: '#ff7f0e' },
@@ -142,6 +143,29 @@
 
                 Plotly.newPlot('chart', plotData, layout, config).then(function(gd) {
                     let isUpdating = false;
+
+
+                // Nasłuchujemy zdarzenia restyle (kliknięcie w legendę) aby chować osie
+                gd.on('plotly_restyle', function(eventdata) {
+                    const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate (y2)
+                    const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty (y1)
+
+                    let updateAxes = {};
+
+                    if (isTrace1Visible) {
+                        updateAxes['yaxis2.visible'] = true;
+                    } else {
+                        updateAxes['yaxis2.visible'] = false;
+                    }
+
+                    if (isTrace2Visible) {
+                        updateAxes['yaxis.visible'] = true;
+                    } else {
+                        updateAxes['yaxis.visible'] = false;
+                    }
+
+                    Plotly.relayout(gd, updateAxes);
+                });
 
                     gd.on('plotly_relayout', function(eventdata) {
                         if (isUpdating) return; // Zapobieganie pętli nieskończonej wywołanej przez relayout
@@ -221,6 +245,8 @@
                         }
 
                         if (Object.keys(update).length > 0) {
+                            // Zawsze resetuj rangeslider do pelnego zasiegu zeby uniknac jego autoskalowania w pionie
+                            update['xaxis.rangeslider.yaxis.rangemode'] = 'match';
                             isUpdating = true;
                             Plotly.relayout(gd, update).then(() => {
                                 isUpdating = false;
