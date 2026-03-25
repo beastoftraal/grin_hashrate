@@ -115,14 +115,16 @@
                     yaxis: {
                         title: 'Hashrate (Gps)',
                         titlefont: { color: '#1f77b4' },
-                        tickfont: { color: '#1f77b4' }
+                        tickfont: { color: '#1f77b4' },
+                        type: 'log' // Skala logarytmiczna
                     },
                     yaxis2: {
                         title: 'Difficulty',
                         titlefont: { color: '#ff7f0e' },
                         tickfont: { color: '#ff7f0e' },
                         overlaying: 'y', // Nałożenie drugiej osi na ten sam wykres
-                        side: 'right'   // Oś po prawej stronie
+                        side: 'right',   // Oś po prawej stronie
+                        type: 'log' // Skala logarytmiczna
                     },
                     hovermode: 'x unified', // Informacje z obu osi na hover
                     legend: {
