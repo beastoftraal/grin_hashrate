@@ -103,13 +103,11 @@
                         title: 'Data i Czas (UTC)',
                         type: 'date',
                         rangeslider: {
-                            visible: true,
-                            yaxis: {
-                                rangemode: 'auto'
-                            }
+                            visible: true
                         } // Suwak pod wykresem do kontroli zakresu (skali)
                     },
                     yaxis: { // Główna oś po lewej stronie - Teraz Difficulty
+                        fixedrange: false, // Domyślnie, dla głównej osi
                         title: 'Difficulty',
                         titlefont: { color: '#ff7f0e' },
                         tickfont: { color: '#ff7f0e' },
@@ -117,6 +115,7 @@
                         autorange: true
                     },
                     yaxis2: { // Druga oś po prawej stronie - Teraz Hashrate
+                        fixedrange: false, // Domyślnie
                         title: 'Hashrate (Gps)',
                         titlefont: { color: '#1f77b4' },
                         tickfont: { color: '#1f77b4' },
@@ -196,6 +195,7 @@
                             }
 
                             // Przeliczenie nowej logarytmicznej osi z 5% marginesem góra/dół dla lewej osi (Difficulty)
+                            // oraz wymuszenie oddzielenia zachowania slidera od main osi
                             if (hasY1) {
                                 let logY1Min = Math.log10(y1Min);
                                 let logY1Max = Math.log10(y1Max);
@@ -214,6 +214,10 @@
                                 update['yaxis2.range'] = [logY2Min - pad2, logY2Max + pad2];
                                 update['yaxis2.autorange'] = false;
                             }
+
+                            // To force the rangeslider NOT to follow the new Y ranges of main axes
+
+
                         }
 
                         if (Object.keys(update).length > 0) {
