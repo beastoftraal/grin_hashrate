@@ -40,8 +40,8 @@
 
     <div id="chart"></div>
 
+
     <script>
-        // Funkcja wczytująca plik CSV
         Papa.parse('grin_data.csv', {
             download: true,
             header: true,
@@ -49,27 +49,40 @@
             skipEmptyLines: true,
             complete: function(results) {
                 const data = results.data;
-
-                // Jeżeli brak danych, zatrzymaj
                 if (!data || data.length === 0) {
                     document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>Brak danych do wyświetlenia.</p>";
                     return;
                 }
 
-                // Przygotowanie tablic dla Plotly
                 const dates = [];
                 const hashrates = [];
                 const difficulties = [];
+
+                let globalY1Min = Infinity, globalY1Max = -Infinity;
+                let globalY2Min = Infinity, globalY2Max = -Infinity;
 
                 data.forEach(row => {
                     if (row.datetime) {
                         dates.push(row.datetime);
                         hashrates.push(row.hashrate || 0);
                         difficulties.push(row.difficulty || 0);
+
+                        if (row.difficulty > 0) {
+                            globalY1Min = Math.min(globalY1Min, row.difficulty);
+                            globalY1Max = Math.max(globalY1Max, row.difficulty);
+                        }
+                        if (row.hashrate > 0) {
+                            globalY2Min = Math.min(globalY2Min, row.hashrate);
+                            globalY2Max = Math.max(globalY2Max, row.hashrate);
+                        }
                     }
                 });
 
-                // Definicja pierwszej krzywej (Hashrate) - Prawa oś (y2)
+                let logGlobalY1Min = Math.log10(globalY1Min);
+                let logGlobalY1Max = Math.log10(globalY1Max);
+                let logGlobalY2Min = Math.log10(globalY2Min);
+                let logGlobalY2Max = Math.log10(globalY2Max);
+
                 const traceHashrate = {
                     x: dates,
                     y: hashrates,
@@ -81,7 +94,6 @@
                     yaxis: 'y2'
                 };
 
-                // Definicja drugiej krzywej (Difficulty) - Lewa oś (y1)
                 const traceDifficulty = {
                     x: dates,
                     y: difficulties,
@@ -91,42 +103,43 @@
                     line: { color: '#ff7f0e', width: 2 },
                     marker: { size: 4 },
                     yaxis: 'y1',
-                    visible: 'legendonly' // Domyślnie ukryte, dostępne do włączenia w legendzie
+                    visible: 'legendonly' // Domyślnie schowane
                 };
 
                 const plotData = [traceHashrate, traceDifficulty];
 
-                // Układ wykresu
                 const layout = {
                     title: 'GRIN Hashrate vs Difficulty w czasie',
                     xaxis: {
                         title: 'Data i Czas (UTC)',
                         type: 'date',
                         rangeslider: {
-                            visible: true
-                        } // Suwak pod wykresem do kontroli zakresu (skali)
+                            visible: true,
+                            // Magiczny trick na uciekające yaxis2 w rangeslider w Plotly:
+                            // Możemy uciąć skalowanie Y na suwaku całkowicie (ignorowanie min/max osi)
+                            yaxis: { rangemode: 'match' }
+                        }
                     },
-                    yaxis: { // Główna oś po lewej stronie - Teraz Difficulty
-                        visible: false, // Schowana, bo difficulty jest domyslnie wylaczone w legendzie
-                        fixedrange: false, // Domyślnie, dla głównej osi
+                    yaxis: {
                         title: 'Difficulty',
                         titlefont: { color: '#ff7f0e' },
                         tickfont: { color: '#ff7f0e' },
                         type: 'log',
-                        autorange: true
+                        autorange: true,
+                        visible: false // Początkowo niewidoczna, bo linia też ukryta
                     },
-                    yaxis2: { // Druga oś po prawej stronie - Teraz Hashrate
-                        fixedrange: false, // Domyślnie
+                    yaxis2: {
                         title: 'Hashrate (Gps)',
                         titlefont: { color: '#1f77b4' },
                         tickfont: { color: '#1f77b4' },
                         overlaying: 'y',
                         side: 'right',
                         type: 'log',
-                        autorange: true
+                        autorange: true,
+                        visible: true
                     },
-                    hovermode: 'x unified', // Informacje z obu osi na hover
-                    showlegend: true, // Wymuszenie wyświetlania legendy
+                    hovermode: 'x unified',
+                    showlegend: true,
                     legend: {
                         orientation: 'h',
                         y: -0.5,
@@ -138,42 +151,91 @@
 
                 const config = {
                     responsive: true,
-                    displayModeBar: true // Pokazywanie paska narzędzi do przybliżania itp
+                    displayModeBar: true
                 };
 
                 Plotly.newPlot('chart', plotData, layout, config).then(function(gd) {
+
+                    // Odświeżanie skali po "włączeniu widoczności" (kliknięciu legendy)
+                    gd.on('plotly_restyle', function() {
+                        const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate (y2)
+                        const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty (y1)
+
+                        let updateAxes = {};
+
+                        // Zwijanie / Rozwijanie podziałki (osi z liczbami)
+                        updateAxes['yaxis2.visible'] = !!isTrace1Visible;
+                        updateAxes['yaxis.visible'] = !!isTrace2Visible;
+
+                        // Wyliczanie nowej skali dla widocznych danych (tak jak robi to relayout)
+                        // Aby upewnić się, że to działa TYLKO dla obecnie widocznego zakresu na X (zooma):
+                        let xStart, xEnd;
+                        if (gd.layout.xaxis && gd.layout.xaxis.range) {
+                            xStart = new Date(gd.layout.xaxis.range[0]).getTime();
+                            xEnd = new Date(gd.layout.xaxis.range[1]).getTime();
+                        } else {
+                            xStart = new Date(dates[0]).getTime();
+                            xEnd = new Date(dates[dates.length - 1]).getTime();
+                        }
+
+                        let y1Min = Infinity, y1Max = -Infinity;
+                        let y2Min = Infinity, y2Max = -Infinity;
+                        let hasY1 = false, hasY2 = false;
+
+                        for (let i = 0; i < dates.length; i++) {
+                            let time = new Date(dates[i]).getTime();
+                            if (time >= xStart && time <= xEnd) {
+                                if (isTrace1Visible && hashrates[i] > 0) {
+                                    y2Min = Math.min(y2Min, hashrates[i]);
+                                    y2Max = Math.max(y2Max, hashrates[i]);
+                                    hasY2 = true;
+                                }
+                                if (isTrace2Visible && difficulties[i] > 0) {
+                                    y1Min = Math.min(y1Min, difficulties[i]);
+                                    y1Max = Math.max(y1Max, difficulties[i]);
+                                    hasY1 = true;
+                                }
+                            }
+                        }
+
+                        if (hasY1) {
+                            let logMin = Math.log10(y1Min);
+                            let logMax = Math.log10(y1Max);
+                            let pad = (logMax - logMin) * 0.05;
+                            if (pad === 0) pad = 0.1;
+                            updateAxes['yaxis.range'] = [logMin - pad, logMax + pad];
+                            updateAxes['yaxis.autorange'] = false;
+                        } else {
+                            // Jesli ukrylismy, to ustawmy globalny zebysmy nie popsuli rangeslidera
+                            updateAxes['yaxis.range'] = [logGlobalY1Min - 0.1, logGlobalY1Max + 0.1];
+                        }
+
+                        if (hasY2) {
+                            let logMin = Math.log10(y2Min);
+                            let logMax = Math.log10(y2Max);
+                            let pad = (logMax - logMin) * 0.05;
+                            if (pad === 0) pad = 0.1;
+                            updateAxes['yaxis2.range'] = [logMin - pad, logMax + pad];
+                            updateAxes['yaxis2.autorange'] = false;
+                        } else {
+                            updateAxes['yaxis2.range'] = [logGlobalY2Min - 0.1, logGlobalY2Max + 0.1];
+                        }
+
+                        // Relayout wymusi zaktualizowanie zarówno osi widoczności jak i skali
+                        // BEZ dotykania zzoomowanego zakresu X
+                        Plotly.relayout(gd, updateAxes);
+                    });
+
+
                     let isUpdating = false;
-
-
-                // Nasłuchujemy zdarzenia restyle (kliknięcie w legendę) aby chować osie
-                gd.on('plotly_restyle', function(eventdata) {
-                    const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate (y2)
-                    const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty (y1)
-
-                    let updateAxes = {};
-
-                    if (isTrace1Visible) {
-                        updateAxes['yaxis2.visible'] = true;
-                    } else {
-                        updateAxes['yaxis2.visible'] = false;
-                    }
-
-                    if (isTrace2Visible) {
-                        updateAxes['yaxis.visible'] = true;
-                    } else {
-                        updateAxes['yaxis.visible'] = false;
-                    }
-
-                    Plotly.relayout(gd, updateAxes);
-                });
-
+                    // Auto-skalowanie przy zoomowaniu
                     gd.on('plotly_relayout', function(eventdata) {
-                        if (isUpdating) return; // Zapobieganie pętli nieskończonej wywołanej przez relayout
+                        if (isUpdating) return;
 
-                        // Sprawdzamy czy zmiana dotyczy osi X (powiększanie, przyciski zakresu)
                         let xStart, xEnd;
                         let shouldUpdate = false;
 
+                        // Czy ruszono suwak/zoom osi X?
                         if (eventdata['xaxis.range[0]'] && eventdata['xaxis.range[1]']) {
                             xStart = new Date(eventdata['xaxis.range[0]']).getTime();
                             xEnd = new Date(eventdata['xaxis.range[1]']).getTime();
@@ -186,7 +248,7 @@
 
                         let update = {};
 
-                        // Resetowanie skali Y, gdy kliknięto "Wszystko" (autorange osi X)
+                        // Reset (podwójne kliknięcie na wykresie żeby wrócić)
                         if (eventdata['xaxis.autorange']) {
                             update['yaxis.autorange'] = true;
                             update['yaxis2.autorange'] = true;
@@ -194,11 +256,10 @@
                         }
 
                         if (shouldUpdate && !eventdata['xaxis.autorange']) {
-                            let y1Min = Infinity, y1Max = -Infinity; // Difficulty
-                            let y2Min = Infinity, y2Max = -Infinity; // Hashrate
+                            let y1Min = Infinity, y1Max = -Infinity;
+                            let y2Min = Infinity, y2Max = -Infinity;
                             let hasY1 = false, hasY2 = false;
 
-                            // Pobierz aktualną widoczność z danych na wykresie
                             const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate
                             const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty
 
@@ -218,35 +279,25 @@
                                 }
                             }
 
-                            // Przeliczenie nowej logarytmicznej osi z 5% marginesem góra/dół dla lewej osi (Difficulty)
-                            // oraz wymuszenie oddzielenia zachowania slidera od main osi
                             if (hasY1) {
-                                let logY1Min = Math.log10(y1Min);
-                                let logY1Max = Math.log10(y1Max);
-                                let pad1 = (logY1Max - logY1Min) * 0.05;
-                                if (pad1 === 0) pad1 = 0.1;
-                                update['yaxis.range'] = [logY1Min - pad1, logY1Max + pad1];
+                                let logMin = Math.log10(y1Min);
+                                let logMax = Math.log10(y1Max);
+                                let pad = (logMax - logMin) * 0.05;
+                                if (pad === 0) pad = 0.1;
+                                update['yaxis.range'] = [logMin - pad, logMax + pad];
                                 update['yaxis.autorange'] = false;
                             }
-
-                            // Dla prawej osi (Hashrate)
                             if (hasY2) {
-                                let logY2Min = Math.log10(y2Min);
-                                let logY2Max = Math.log10(y2Max);
-                                let pad2 = (logY2Max - logY2Min) * 0.05;
-                                if (pad2 === 0) pad2 = 0.1;
-                                update['yaxis2.range'] = [logY2Min - pad2, logY2Max + pad2];
+                                let logMin = Math.log10(y2Min);
+                                let logMax = Math.log10(y2Max);
+                                let pad = (logMax - logMin) * 0.05;
+                                if (pad === 0) pad = 0.1;
+                                update['yaxis2.range'] = [logMin - pad, logMax + pad];
                                 update['yaxis2.autorange'] = false;
                             }
-
-                            // To force the rangeslider NOT to follow the new Y ranges of main axes
-
-
                         }
 
                         if (Object.keys(update).length > 0) {
-                            // Zawsze resetuj rangeslider do pelnego zasiegu zeby uniknac jego autoskalowania w pionie
-                            update['xaxis.rangeslider.yaxis.rangemode'] = 'match';
                             isUpdating = true;
                             Plotly.relayout(gd, update).then(() => {
                                 isUpdating = false;
