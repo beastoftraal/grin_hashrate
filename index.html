@@ -129,11 +129,14 @@
                         autorange: true // Automatyczne dostosowywanie skali
                     },
                     hovermode: 'x unified', // Informacje z obu osi na hover
+                    showlegend: true, // Wymuszenie wyświetlania legendy
                     legend: {
                         orientation: 'h',
-                        y: -0.2
+                        y: -0.5,
+                        x: 0.5,
+                        xanchor: 'center'
                     },
-                    margin: { l: 60, r: 60, t: 50, b: 50 }
+                    margin: { l: 60, r: 60, t: 50, b: 80 }
                 };
 
                 const config = {
