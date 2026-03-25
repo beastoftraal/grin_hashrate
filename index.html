@@ -144,9 +144,92 @@
                     displayModeBar: true // Pokazywanie paska narzędzi do przybliżania itp
                 };
 
-                Plotly.newPlot('chart', plotData, layout, config);
-            },
-            error: function(error) {
+
+
+                Plotly.newPlot('chart', plotData, layout, config).then(function(gd) {
+                    let isUpdating = false;
+
+                    gd.on('plotly_relayout', function(eventdata) {
+                        if (isUpdating) return; // Zapobieganie pętli nieskończonej wywołanej przez relayout
+
+                        // Sprawdzamy czy zmiana dotyczy osi X (powiększanie, przyciski zakresu)
+                        let xStart, xEnd;
+                        let shouldUpdate = false;
+
+                        if (eventdata['xaxis.range[0]'] && eventdata['xaxis.range[1]']) {
+                            xStart = new Date(eventdata['xaxis.range[0]']).getTime();
+                            xEnd = new Date(eventdata['xaxis.range[1]']).getTime();
+                            shouldUpdate = true;
+                        } else if (eventdata['xaxis.range']) {
+                            xStart = new Date(eventdata['xaxis.range'][0]).getTime();
+                            xEnd = new Date(eventdata['xaxis.range'][1]).getTime();
+                            shouldUpdate = true;
+                        }
+
+                        let update = {};
+
+                        // Resetowanie skali Y, gdy kliknięto "Wszystko" (autorange osi X)
+                        if (eventdata['xaxis.autorange']) {
+                            update['yaxis.autorange'] = true;
+                            update['yaxis2.autorange'] = true;
+                            shouldUpdate = true;
+                        }
+
+                        if (shouldUpdate && !eventdata['xaxis.autorange']) {
+                            let y1Min = Infinity, y1Max = -Infinity;
+                            let y2Min = Infinity, y2Max = -Infinity;
+                            let hasY1 = false, hasY2 = false;
+
+                            // Pobierz aktualną widoczność z danych na wykresie
+                            const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false;
+                            const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false;
+
+                            for (let i = 0; i < dates.length; i++) {
+                                let time = new Date(dates[i]).getTime();
+                                if (time >= xStart && time <= xEnd) {
+                                    if (isTrace1Visible && hashrates[i] > 0) {
+                                        y1Min = Math.min(y1Min, hashrates[i]);
+                                        y1Max = Math.max(y1Max, hashrates[i]);
+                                        hasY1 = true;
+                                    }
+                                    if (isTrace2Visible && difficulties[i] > 0) {
+                                        y2Min = Math.min(y2Min, difficulties[i]);
+                                        y2Max = Math.max(y2Max, difficulties[i]);
+                                        hasY2 = true;
+                                    }
+                                }
+                            }
+
+                            // Przeliczenie nowej logarytmicznej osi z 5% marginesem góra/dół
+                            if (hasY1) {
+                                let logY1Min = Math.log10(y1Min);
+                                let logY1Max = Math.log10(y1Max);
+                                let pad1 = (logY1Max - logY1Min) * 0.05;
+                                if (pad1 === 0) pad1 = 0.1;
+                                update['yaxis.range'] = [logY1Min - pad1, logY1Max + pad1];
+                                update['yaxis.autorange'] = false;
+                            }
+
+                            if (hasY2) {
+                                let logY2Min = Math.log10(y2Min);
+                                let logY2Max = Math.log10(y2Max);
+                                let pad2 = (logY2Max - logY2Min) * 0.05;
+                                if (pad2 === 0) pad2 = 0.1;
+                                update['yaxis2.range'] = [logY2Min - pad2, logY2Max + pad2];
+                                update['yaxis2.autorange'] = false;
+                            }
+                        }
+
+                        if (Object.keys(update).length > 0) {
+                            isUpdating = true;
+                            Plotly.relayout(gd, update).then(() => {
+                                isUpdating = false;
+                            });
+                        }
+                    });
+                });
+ },
+                       error: function(error) {
                 console.error("Błąd podczas wczytywania CSV:", error);
                 document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>Nie udało się wczytać danych z pliku `grin_data.csv`.</p>";
             }
