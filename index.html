@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRIN Network Stats (2Miners)</title>
+    <!-- Ładowanie Plotly.js do interaktywnych wykresów -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- Ładowanie PapaParse do parsowania pliku CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+        }
+        #chart {
+            width: 100%;
+            height: 600px;
+            margin-top: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .info {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>GRIN Network Hashrate & Difficulty (2Miners)</h1>
+    <p class="info">Dane są aktualizowane codziennie. Wykres jest interaktywny - użyj myszki lub dotyku aby przybliżyć (zoom) lub przewinąć (pan).</p>
+
+    <div id="chart"></div>
+
+    <script>
+        // Funkcja wczytująca plik CSV
+        Papa.parse('grin_data.csv', {
+            download: true,
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                const data = results.data;
+
+                // Jeżeli brak danych, zatrzymaj
+                if (!data || data.length === 0) {
+                    document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>Brak danych do wyświetlenia.</p>";
+                    return;
+                }
+
+                // Przygotowanie tablic dla Plotly
+                const dates = [];
+                const hashrates = [];
+                const difficulties = [];
+
+                data.forEach(row => {
+                    if (row.datetime) {
+                        dates.push(row.datetime);
+                        hashrates.push(row.hashrate || 0);
+                        difficulties.push(row.difficulty || 0);
+                    }
+                });
+
+                // Definicja pierwszej krzywej (Hashrate)
+                const traceHashrate = {
+                    x: dates,
+                    y: hashrates,
+                    name: 'Hashrate (Gps)',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#1f77b4', width: 2 },
+                    marker: { size: 4 },
+                    yaxis: 'y1'
+                };
+
+                // Definicja drugiej krzywej (Difficulty)
+                const traceDifficulty = {
+                    x: dates,
+                    y: difficulties,
+                    name: 'Difficulty',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#ff7f0e', width: 2 },
+                    marker: { size: 4 },
+                    yaxis: 'y2' // Skierowanie na prawą oś Y
+                };
+
+                const plotData = [traceHashrate, traceDifficulty];
+
+                // Układ wykresu
+                const layout = {
+                    title: 'GRIN Hashrate vs Difficulty w czasie',
+                    xaxis: {
+                        title: 'Data i Czas (UTC)',
+                        type: 'date',
+                        rangeslider: { visible: true }, // Suwak pod wykresem do kontroli zakresu (skali)
+                        rangeselector: {
+                            buttons: [
+                                { count: 1, label: '1 dzień', step: 'day', stepmode: 'backward' },
+                                { count: 7, label: '1 tydzień', step: 'day', stepmode: 'backward' },
+                                { count: 1, label: '1 miesiąc', step: 'month', stepmode: 'backward' },
+                                { step: 'all', label: 'Wszystko' }
+                            ]
+                        }
+                    },
+                    yaxis: {
+                        title: 'Hashrate (Gps)',
+                        titlefont: { color: '#1f77b4' },
+                        tickfont: { color: '#1f77b4' }
+                    },
+                    yaxis2: {
+                        title: 'Difficulty',
+                        titlefont: { color: '#ff7f0e' },
+                        tickfont: { color: '#ff7f0e' },
+                        overlaying: 'y', // Nałożenie drugiej osi na ten sam wykres
+                        side: 'right'   // Oś po prawej stronie
+                    },
+                    hovermode: 'x unified', // Informacje z obu osi na hover
+                    legend: {
+                        orientation: 'h',
+                        y: -0.2
+                    },
+                    margin: { l: 60, r: 60, t: 50, b: 50 }
+                };
+
+                const config = {
+                    responsive: true,
+                    displayModeBar: true // Pokazywanie paska narzędzi do przybliżania itp
+                };
+
+                Plotly.newPlot('chart', plotData, layout, config);
+            },
+            error: function(error) {
+                console.error("Błąd podczas wczytywania CSV:", error);
+                document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>Nie udało się wczytać danych z pliku `grin_data.csv`.</p>";
+            }
+        });
+    </script>
+</body>
+</html>
