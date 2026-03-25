@@ -69,7 +69,7 @@
                     }
                 });
 
-                // Definicja pierwszej krzywej (Hashrate)
+                // Definicja pierwszej krzywej (Hashrate) - Prawa oś (y2)
                 const traceHashrate = {
                     x: dates,
                     y: hashrates,
@@ -78,10 +78,10 @@
                     mode: 'lines+markers',
                     line: { color: '#1f77b4', width: 2 },
                     marker: { size: 4 },
-                    yaxis: 'y1'
+                    yaxis: 'y2'
                 };
 
-                // Definicja drugiej krzywej (Difficulty)
+                // Definicja drugiej krzywej (Difficulty) - Lewa oś (y1)
                 const traceDifficulty = {
                     x: dates,
                     y: difficulties,
@@ -90,7 +90,7 @@
                     mode: 'lines+markers',
                     line: { color: '#ff7f0e', width: 2 },
                     marker: { size: 4 },
-                    yaxis: 'y2' // Skierowanie na prawą oś Y
+                    yaxis: 'y1'
                 };
 
                 const plotData = [traceHashrate, traceDifficulty];
@@ -111,21 +111,21 @@
                             ]
                         }
                     },
-                    yaxis: {
-                        title: 'Hashrate (Gps)',
-                        titlefont: { color: '#1f77b4' },
-                        tickfont: { color: '#1f77b4' },
-                        type: 'log', // Skala logarytmiczna
-                        autorange: true // Automatyczne dostosowywanie skali
-                    },
-                    yaxis2: {
+                    yaxis: { // Główna oś po lewej stronie - Teraz Difficulty
                         title: 'Difficulty',
                         titlefont: { color: '#ff7f0e' },
                         tickfont: { color: '#ff7f0e' },
-                        overlaying: 'y', // Nałożenie drugiej osi na ten sam wykres
-                        side: 'right',   // Oś po prawej stronie
-                        type: 'log', // Skala logarytmiczna
-                        autorange: true // Automatyczne dostosowywanie skali
+                        type: 'log',
+                        autorange: true
+                    },
+                    yaxis2: { // Druga oś po prawej stronie - Teraz Hashrate
+                        title: 'Hashrate (Gps)',
+                        titlefont: { color: '#1f77b4' },
+                        tickfont: { color: '#1f77b4' },
+                        overlaying: 'y',
+                        side: 'right',
+                        type: 'log',
+                        autorange: true
                     },
                     hovermode: 'x unified', // Informacje z obu osi na hover
                     showlegend: true, // Wymuszenie wyświetlania legendy
@@ -142,8 +142,6 @@
                     responsive: true,
                     displayModeBar: true // Pokazywanie paska narzędzi do przybliżania itp
                 };
-
-
 
                 Plotly.newPlot('chart', plotData, layout, config).then(function(gd) {
                     let isUpdating = false;
@@ -175,31 +173,31 @@
                         }
 
                         if (shouldUpdate && !eventdata['xaxis.autorange']) {
-                            let y1Min = Infinity, y1Max = -Infinity;
-                            let y2Min = Infinity, y2Max = -Infinity;
+                            let y1Min = Infinity, y1Max = -Infinity; // Difficulty
+                            let y2Min = Infinity, y2Max = -Infinity; // Hashrate
                             let hasY1 = false, hasY2 = false;
 
                             // Pobierz aktualną widoczność z danych na wykresie
-                            const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false;
-                            const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false;
+                            const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate
+                            const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty
 
                             for (let i = 0; i < dates.length; i++) {
                                 let time = new Date(dates[i]).getTime();
                                 if (time >= xStart && time <= xEnd) {
                                     if (isTrace1Visible && hashrates[i] > 0) {
-                                        y1Min = Math.min(y1Min, hashrates[i]);
-                                        y1Max = Math.max(y1Max, hashrates[i]);
-                                        hasY1 = true;
+                                        y2Min = Math.min(y2Min, hashrates[i]);
+                                        y2Max = Math.max(y2Max, hashrates[i]);
+                                        hasY2 = true;
                                     }
                                     if (isTrace2Visible && difficulties[i] > 0) {
-                                        y2Min = Math.min(y2Min, difficulties[i]);
-                                        y2Max = Math.max(y2Max, difficulties[i]);
-                                        hasY2 = true;
+                                        y1Min = Math.min(y1Min, difficulties[i]);
+                                        y1Max = Math.max(y1Max, difficulties[i]);
+                                        hasY1 = true;
                                     }
                                 }
                             }
 
-                            // Przeliczenie nowej logarytmicznej osi z 5% marginesem góra/dół
+                            // Przeliczenie nowej logarytmicznej osi z 5% marginesem góra/dół dla lewej osi (Difficulty)
                             if (hasY1) {
                                 let logY1Min = Math.log10(y1Min);
                                 let logY1Max = Math.log10(y1Max);
@@ -209,6 +207,7 @@
                                 update['yaxis.autorange'] = false;
                             }
 
+                            // Dla prawej osi (Hashrate)
                             if (hasY2) {
                                 let logY2Min = Math.log10(y2Min);
                                 let logY2Max = Math.log10(y2Max);
@@ -227,8 +226,8 @@
                         }
                     });
                 });
- },
-                       error: function(error) {
+            },
+            error: function(error) {
                 console.error("Błąd podczas wczytywania CSV:", error);
                 document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>Nie udało się wczytać danych z pliku `grin_data.csv`.</p>";
             }
