@@ -5,41 +5,52 @@ import json
 import re
 from datetime import datetime, timezone
 
-TARGET_URL = "https://2miners.com/grin-network-hashrate"
+# Źródło 1: Główne historyczne statystyki codzienne (od początku istnienia sieci)
+URL_ALL_TIME = "https://hr.2miners.com/api/v1/hashrate/1d/grin"
+# Źródło 2: Bardziej szczegółowe statystyki z ostatnich dni zagnieżdżone w HTML
+URL_RECENT_HTML = "https://2miners.com/grin-network-hashrate"
 CSV_FILE = "grin_data.csv"
 
 def fetch_data():
-    try:
-        response = requests.get(TARGET_URL)
-        response.raise_for_status()
-        html = response.text
+    all_points = {}
 
-        # Wyszukujemy tablice obiektów zawierających {"timestamp": ...}
-        # w kodzie JS osadzonym w dokumencie
-        match = re.search(r'(\[{"timestamp".*?\}\])', html)
-        if match:
-            json_str = match.group(1)
-            try:
-                data = json.loads(json_str)
-                formatted_data = []
-                for point in data:
-                    ts = point.get("timestamp")
-                    if ts:
-                        formatted_data.append({
-                            "x": ts,
-                            "y": point.get("hashrate", 0),
-                            "netdiff": point.get("difficulty", 0)
-                        })
-                return formatted_data
-            except json.JSONDecodeError as e:
-                print(f"Błąd podczas parsowania JSON: {e}")
-                return []
-        else:
-            print("Nie znaleziono danych na stronie.")
-            return []
+    # 1. Pobieranie danych historycznych za cały czas (dzienne próbki)
+    try:
+        response_all = requests.get(URL_ALL_TIME)
+        response_all.raise_for_status()
+        data_all = response_all.json()
+        for point in data_all:
+            ts = point.get("timestamp")
+            if ts:
+                all_points[ts] = {
+                    "x": ts,
+                    "y": point.get("hashrate", 0),
+                    "netdiff": point.get("difficulty", 0)
+                }
     except Exception as e:
-        print(f"Error fetching data: {e}")
-        return []
+        print(f"Error fetching all-time data: {e}")
+
+    # 2. Pobieranie nowszych, bardziej szczegółowych danych z tagu skryptu HTML (godzinowe próbki z ostatnich miesięcy)
+    try:
+        response_recent = requests.get(URL_RECENT_HTML)
+        response_recent.raise_for_status()
+        match = re.search(r'(\[{"timestamp".*?\}\])', response_recent.text)
+        if match:
+            data_recent = json.loads(match.group(1))
+            for point in data_recent:
+                ts = point.get("timestamp")
+                if ts:
+                    # To nadpisze codzienne (jeśli timestamp idealnie się pokrywa, choć zwykle godzinowe są unikalne)
+                    all_points[ts] = {
+                        "x": ts,
+                        "y": point.get("hashrate", 0),
+                        "netdiff": point.get("difficulty", 0)
+                    }
+    except Exception as e:
+        print(f"Error fetching recent HTML data: {e}")
+
+    # Zwróć jako listę, posortowaną po timestampie
+    return [all_points[ts] for ts in sorted(all_points.keys())]
 
 def update_csv():
     new_data = fetch_data()
