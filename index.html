@@ -90,7 +90,8 @@
                     mode: 'lines+markers',
                     line: { color: '#ff7f0e', width: 2 },
                     marker: { size: 4 },
-                    yaxis: 'y1'
+                    yaxis: 'y1',
+                    visible: 'legendonly' // Domyślnie ukryte, dostępne do włączenia w legendzie
                 };
 
                 const plotData = [traceHashrate, traceDifficulty];
@@ -101,7 +102,12 @@
                     xaxis: {
                         title: 'Data i Czas (UTC)',
                         type: 'date',
-                        rangeslider: { visible: true } // Suwak pod wykresem do kontroli zakresu (skali)
+                        rangeslider: {
+                            visible: true,
+                            yaxis: {
+                                rangemode: 'auto'
+                            }
+                        } // Suwak pod wykresem do kontroli zakresu (skali)
                     },
                     yaxis: { // Główna oś po lewej stronie - Teraz Difficulty
                         title: 'Difficulty',
