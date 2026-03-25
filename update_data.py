@@ -1,19 +1,42 @@
 import requests
 import csv
 import os
+import json
+import re
 from datetime import datetime, timezone
 
-API_URL = "https://grin.2miners.com/api/stats"
+TARGET_URL = "https://2miners.com/grin-network-hashrate"
 CSV_FILE = "grin_data.csv"
 
 def fetch_data():
     try:
-        response = requests.get(API_URL)
+        response = requests.get(TARGET_URL)
         response.raise_for_status()
-        data = response.json()
-        # W algorytmie GRIN 2miners używa klucza '32'
-        charts_data = data.get("charts", {}).get("32", [])
-        return charts_data
+        html = response.text
+
+        # Wyszukujemy tablice obiektów zawierających {"timestamp": ...}
+        # w kodzie JS osadzonym w dokumencie
+        match = re.search(r'(\[{"timestamp".*?\}\])', html)
+        if match:
+            json_str = match.group(1)
+            try:
+                data = json.loads(json_str)
+                formatted_data = []
+                for point in data:
+                    ts = point.get("timestamp")
+                    if ts:
+                        formatted_data.append({
+                            "x": ts,
+                            "y": point.get("hashrate", 0),
+                            "netdiff": point.get("difficulty", 0)
+                        })
+                return formatted_data
+            except json.JSONDecodeError as e:
+                print(f"Błąd podczas parsowania JSON: {e}")
+                return []
+        else:
+            print("Nie znaleziono danych na stronie.")
+            return []
     except Exception as e:
         print(f"Error fetching data: {e}")
         return []
@@ -24,10 +47,7 @@ def update_csv():
         print("No data fetched.")
         return
 
-    # Słownik do przechowywania już istniejących punktów po timestamp
     existing_timestamps = set()
-
-    # Sprawdzanie i ładowanie istniejących danych
     file_exists = os.path.isfile(CSV_FILE)
     if file_exists:
         with open(CSV_FILE, mode='r', newline='', encoding='utf-8') as f:
@@ -36,25 +56,21 @@ def update_csv():
             for row in reader:
                 if row:
                     try:
-                        # Przechowujemy oryginalny unix timestamp, by uniknąć duplikatów
                         ts = int(row[0])
                         existing_timestamps.add(ts)
                     except ValueError:
                         pass
 
-    # Przygotowanie nowych wierszy
     rows_to_append = []
     for point in new_data:
         ts = point.get("x")
         if ts is not None and ts not in existing_timestamps:
-            # Formatowanie timestampa do czytelnego formatu
             readable_time = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-            hashrate = point.get("y", 0) # y to hashrate w Gps (lub odpowiedniej jednostce)
+            hashrate = point.get("y", 0)
             difficulty = point.get("netdiff", 0)
             rows_to_append.append([ts, readable_time, hashrate, difficulty])
             existing_timestamps.add(ts)
 
-    # Sortowanie danych po timestampie, by upewnić się, że idą chronologicznie
     rows_to_append.sort(key=lambda x: x[0])
 
     if rows_to_append:
