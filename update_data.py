@@ -13,6 +13,9 @@ CSV_FILE = "grin_data.csv"
 # Strefa CET (UTC+1)
 CET_TZ = timezone(timedelta(hours=1))
 
+# Data odcięcia danych: 16.01.2021
+CUTOFF_DATE_STR = "2021-01-16"
+
 def fetch_data():
     daily_points = {}
     hourly_collections = {} # Do zbierania wielu próbek z jednego dnia
@@ -28,6 +31,10 @@ def fetch_data():
             if ts and ts <= current_time_ts:
                 dt_cet = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(CET_TZ)
                 day_str = dt_cet.strftime('%Y-%m-%d')
+
+                # Odrzucamy dni przed 16.01.2021
+                if day_str < CUTOFF_DATE_STR:
+                    continue
 
                 # Używamy 12:00 jako godziny reprezentatywnej dla formatu wyjściowego
                 dt_repr = dt_cet.replace(hour=12, minute=0, second=0)
@@ -53,6 +60,9 @@ def fetch_data():
                 if ts and ts <= current_time_ts:
                     dt_cet = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(CET_TZ)
                     day_str = dt_cet.strftime('%Y-%m-%d')
+
+                    if day_str < CUTOFF_DATE_STR:
+                        continue
 
                     if day_str not in hourly_collections:
                         hourly_collections[day_str] = {"y": [], "netdiff": []}
