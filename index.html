@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GRIN Network Stats (2Miners)</title>
+    <title>GRIN Network Stats</title>
     <!-- Load Plotly.js for interactive charts -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <!-- Load PapaParse to parse the CSV file -->
@@ -36,7 +36,7 @@
 </head>
 <body>
 
-    <h1>GRIN Network Hashrate & Difficulty (2Miners)</h1>
+    <h1>GRIN Network Graphrate & Difficulty</h1>
 
     <div id="chart"></div>
 
@@ -86,7 +86,7 @@
                 const traceHashrate = {
                     x: dates,
                     y: hashrates,
-                    name: 'Hashrate (Gps)',
+                    name: 'Graphrate (Gps)',
                     type: 'scatter',
                     mode: 'lines+markers',
                     line: { color: '#1f77b4', width: 2 },
@@ -109,7 +109,7 @@
                 const plotData = [traceHashrate, traceDifficulty];
 
                 const layout = {
-                    title: 'GRIN Hashrate vs Difficulty over time',
+                    title: 'GRIN Graphrate vs Difficulty over time',
                     xaxis: {
                         title: 'Date and Time (UTC)',
                         type: 'date',
@@ -129,7 +129,7 @@
                         visible: false // Initially invisible since line is hidden
                     },
                     yaxis2: {
-                        title: 'Hashrate (Gps)',
+                        title: 'Graphrate (Gps)',
                         titlefont: { color: '#1f77b4' },
                         tickfont: { color: '#1f77b4' },
                         overlaying: 'y',
@@ -158,7 +158,7 @@
 
                     // Refresh scaling upon toggling visibility (clicking legend)
                     gd.on('plotly_restyle', function() {
-                        const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate (y2)
+                        const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Graphrate (y2)
                         const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty (y1)
 
                         let updateAxes = {};
@@ -260,7 +260,7 @@
                             let y2Min = Infinity, y2Max = -Infinity;
                             let hasY1 = false, hasY2 = false;
 
-                            const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate
+                            const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Graphrate
                             const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty
 
                             for (let i = 0; i < dates.length; i++) {
