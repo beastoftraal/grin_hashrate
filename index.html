@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRIN Network Stats (2Miners)</title>
-    <!-- Ładowanie Plotly.js do interaktywnych wykresów -->
+    <!-- Load Plotly.js for interactive charts -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <!-- Ładowanie PapaParse do parsowania pliku CSV -->
+    <!-- Load PapaParse to parse the CSV file -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body {
@@ -50,7 +50,7 @@
             complete: function(results) {
                 const data = results.data;
                 if (!data || data.length === 0) {
-                    document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>Brak danych do wyświetlenia.</p>";
+                    document.getElementById('chart').innerHTML = "<p style='text-align:center; padding: 20px;'>No data to display.</p>";
                     return;
                 }
 
@@ -103,20 +103,20 @@
                     line: { color: '#ff7f0e', width: 2 },
                     marker: { size: 4 },
                     yaxis: 'y1',
-                    visible: 'legendonly' // Domyślnie schowane
+                    visible: 'legendonly' // Hidden by default
                 };
 
                 const plotData = [traceHashrate, traceDifficulty];
 
                 const layout = {
-                    title: 'GRIN Hashrate vs Difficulty w czasie',
+                    title: 'GRIN Hashrate vs Difficulty over time',
                     xaxis: {
-                        title: 'Data i Czas (UTC)',
+                        title: 'Date and Time (UTC)',
                         type: 'date',
                         rangeslider: {
                             visible: true,
-                            // Magiczny trick na uciekające yaxis2 w rangeslider w Plotly:
-                            // Możemy uciąć skalowanie Y na suwaku całkowicie (ignorowanie min/max osi)
+                            // Magic trick to fix runaway yaxis2 in Plotly rangeslider:
+                            // We can cut Y scaling on the slider entirely (ignoring axis min/max)
                             yaxis: { rangemode: 'match' }
                         }
                     },
@@ -126,7 +126,7 @@
                         tickfont: { color: '#ff7f0e' },
                         type: 'log',
                         autorange: true,
-                        visible: false // Początkowo niewidoczna, bo linia też ukryta
+                        visible: false // Initially invisible since line is hidden
                     },
                     yaxis2: {
                         title: 'Hashrate (Gps)',
@@ -156,19 +156,19 @@
 
                 Plotly.newPlot('chart', plotData, layout, config).then(function(gd) {
 
-                    // Odświeżanie skali po "włączeniu widoczności" (kliknięciu legendy)
+                    // Refresh scaling upon toggling visibility (clicking legend)
                     gd.on('plotly_restyle', function() {
                         const isTrace1Visible = gd.data[0].visible !== 'legendonly' && gd.data[0].visible !== false; // Hashrate (y2)
                         const isTrace2Visible = gd.data[1].visible !== 'legendonly' && gd.data[1].visible !== false; // Difficulty (y1)
 
                         let updateAxes = {};
 
-                        // Zwijanie / Rozwijanie podziałki (osi z liczbami)
+                        // Collapse / Expand axis scale numbers
                         updateAxes['yaxis2.visible'] = !!isTrace1Visible;
                         updateAxes['yaxis.visible'] = !!isTrace2Visible;
 
-                        // Wyliczanie nowej skali dla widocznych danych (tak jak robi to relayout)
-                        // Aby upewnić się, że to działa TYLKO dla obecnie widocznego zakresu na X (zooma):
+                        // Calculate new scale for visible data (same as relayout)
+                        // Making sure it works ONLY for the currently visible X range (zoom window):
                         let xStart, xEnd;
                         if (gd.layout.xaxis && gd.layout.xaxis.range) {
                             xStart = new Date(gd.layout.xaxis.range[0]).getTime();
@@ -206,7 +206,7 @@
                             updateAxes['yaxis.range'] = [logMin - pad, logMax + pad];
                             updateAxes['yaxis.autorange'] = false;
                         } else {
-                            // Jesli ukrylismy, to ustawmy globalny zebysmy nie popsuli rangeslidera
+                            // If hidden, reset to global to avoid breaking rangeslider
                             updateAxes['yaxis.range'] = [logGlobalY1Min - 0.1, logGlobalY1Max + 0.1];
                         }
 
@@ -221,21 +221,21 @@
                             updateAxes['yaxis2.range'] = [logGlobalY2Min - 0.1, logGlobalY2Max + 0.1];
                         }
 
-                        // Relayout wymusi zaktualizowanie zarówno osi widoczności jak i skali
-                        // BEZ dotykania zzoomowanego zakresu X
+                        // Relayout forces updates for both axis visibility and scale
+                        // WITHOUT touching the zoomed X range
                         Plotly.relayout(gd, updateAxes);
                     });
 
 
                     let isUpdating = false;
-                    // Auto-skalowanie przy zoomowaniu
+                    // Auto-scaling upon zoom
                     gd.on('plotly_relayout', function(eventdata) {
                         if (isUpdating) return;
 
                         let xStart, xEnd;
                         let shouldUpdate = false;
 
-                        // Czy ruszono suwak/zoom osi X?
+                        // Was X axis slider/zoom moved?
                         if (eventdata['xaxis.range[0]'] && eventdata['xaxis.range[1]']) {
                             xStart = new Date(eventdata['xaxis.range[0]']).getTime();
                             xEnd = new Date(eventdata['xaxis.range[1]']).getTime();
@@ -248,7 +248,7 @@
 
                         let update = {};
 
-                        // Reset (podwójne kliknięcie na wykresie żeby wrócić)
+                        // Reset (double click on chart to revert)
                         if (eventdata['xaxis.autorange']) {
                             update['yaxis.autorange'] = true;
                             update['yaxis2.autorange'] = true;
