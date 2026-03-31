@@ -108,11 +108,17 @@
 
                 const plotData = [traceHashrate, traceDifficulty];
 
+                // Set default visible range to the last 1 year from the latest data point
+                const latestDate = new Date(dates[dates.length - 1]);
+                const oneYearAgo = new Date(latestDate);
+                oneYearAgo.setFullYear(latestDate.getFullYear() - 1);
+
                 const layout = {
                     title: 'GRIN Graphrate vs Difficulty over time',
                     xaxis: {
                         title: 'Date and Time (UTC)',
                         type: 'date',
+                        range: [oneYearAgo.getTime(), latestDate.getTime()],
                         rangeslider: {
                             visible: true,
                             // Magic trick to fix runaway yaxis2 in Plotly rangeslider:
