@@ -19,7 +19,7 @@ CUTOFF_DATE_STR = "2021-01-16"
 def fetch_data():
     daily_points = {}
     hourly_collections = {} # Do zbierania wielu próbek z jednego dnia
-    current_time_ts = datetime.now(timezone.utc).timestamp()
+    current_time_ts = (datetime.now(timezone.utc) + timedelta(days=2)).timestamp() # Tolerancja
 
     # 1. Pobieranie danych historycznych za cały czas (1 punkt na dzień API)
     try:
