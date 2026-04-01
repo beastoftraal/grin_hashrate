@@ -5,25 +5,21 @@ import json
 import re
 from datetime import datetime, timezone, timedelta
 
-# Źródła danych z 2miners
 URL_ALL_TIME = "https://hr.2miners.com/api/v1/hashrate/1d/grin"
 URL_RECENT_HTML = "https://2miners.com/grin-network-hashrate"
 CSV_FILE = "grin_data.csv"
 
-# Strefa CET (UTC+1)
 CET_TZ = timezone(timedelta(hours=1))
-
-# Data odcięcia danych: 16.01.2021
 CUTOFF_DATE_STR = "2021-01-16"
 
 def fetch_data():
     daily_points = {}
-    hourly_collections = {} # Do zbierania wielu próbek z jednego dnia
-    current_time_ts = (datetime.now(timezone.utc) + timedelta(days=2)).timestamp() # Tolerancja
+    hourly_collections = {}
+    # Odpalamy z luznym filtrem 2 tygodni, zeby nie odcinalo spoznionych kropek lub offsetow API
+    current_time_ts = (datetime.now(timezone.utc) + timedelta(days=5)).timestamp()
 
-    # 1. Pobieranie danych historycznych za cały czas (1 punkt na dzień API)
     try:
-        response_all = requests.get(URL_ALL_TIME)
+        response_all = requests.get(URL_ALL_TIME, timeout=10)
         response_all.raise_for_status()
         data_all = response_all.json()
         for point in data_all:
@@ -32,11 +28,9 @@ def fetch_data():
                 dt_cet = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(CET_TZ)
                 day_str = dt_cet.strftime('%Y-%m-%d')
 
-                # Odrzucamy dni przed 16.01.2021
                 if day_str < CUTOFF_DATE_STR:
                     continue
 
-                # Używamy 12:00 jako godziny reprezentatywnej dla formatu wyjściowego
                 dt_repr = dt_cet.replace(hour=12, minute=0, second=0)
                 readable_time = dt_repr.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -48,9 +42,8 @@ def fetch_data():
     except Exception as e:
         print(f"Error fetching all-time data: {e}")
 
-    # 2. Pobieranie nowszych, godzinowych danych i zbieranie ich do średniej
     try:
-        response_recent = requests.get(URL_RECENT_HTML)
+        response_recent = requests.get(URL_RECENT_HTML, timeout=10)
         response_recent.raise_for_status()
         match = re.search(r'(\[{"timestamp".*?\}\])', response_recent.text)
         if match:
@@ -69,25 +62,19 @@ def fetch_data():
 
                     hourly_collections[day_str]["y"].append(point.get("hashrate", 0))
                     hourly_collections[day_str]["netdiff"].append(point.get("difficulty", 0))
-
     except Exception as e:
         print(f"Error fetching recent HTML data: {e}")
 
-    # Wyliczanie średniej dla dni z danymi godzinowymi i nadpisywanie
     for day_str, vals in hourly_collections.items():
         if vals["y"] and vals["netdiff"]:
             avg_y = sum(vals["y"]) / len(vals["y"])
             avg_diff = sum(vals["netdiff"]) / len(vals["netdiff"])
-
-            # Reprezentacyjna godzina dla wiersza wyjściowego
-            # Możemy sparsować date_str by dodać 12:00:00
             readable_time = f"{day_str} 12:00:00"
 
-            # Nadpisujemy ew. punkt z API całodziennego, bardziej dokładną średnią
             daily_points[day_str] = {
                 "datetime": readable_time,
-                "y": round(avg_y, 2), # zaokrąglamy dla czystości CSV
-                "netdiff": int(avg_diff) # difficulty jest ogromne, zazwyczaj integer
+                "y": round(avg_y, 2),
+                "netdiff": int(avg_diff)
             }
 
     sorted_days = sorted(daily_points.keys())
@@ -99,10 +86,12 @@ def update_csv():
         print("No data fetched.")
         return
 
-    # Słownik śledzący unikalne DNI z kolumny `datetime` (np. 2019-03-25)
     existing_days = set()
     file_exists = os.path.isfile(CSV_FILE)
 
+    # Skoro uzytkownik widzi ostatni z 25 marca, to update_data.py NIE potrafil dopisac nowych,
+    # ALBO w ogole sie nie odpalal, ALBO zapisal sie stary current_time_ts ktory ucina?
+    # Wczytajmy to co mamy:
     if file_exists:
         with open(CSV_FILE, mode='r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -113,6 +102,7 @@ def update_csv():
                     existing_days.add(date_val)
 
     rows_to_append = []
+    # Dopiszemy wszystko to, czego brakuje w pliku
     for point in new_data:
         day_str = point["datetime"][:10]
         if day_str not in existing_days:
